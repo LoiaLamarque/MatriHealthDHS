@@ -4,7 +4,7 @@ library(ipumsr)
 
 #0. LOADING FINAL DF, GPS DATA FROM IPUMS AND NL ACTIVITY FROM SHRUG#######
 
-df_final_withouth_NA <- readRDS("01_tidy_data/resid_clean_megha.rds")
+df_final_withouth_NA <- readRDS("MatriHealthDHS/01_tidy_data/resid_philopatry_clean_megha.rds")
 
 #geographical data
 sf_dis_point <- st_read("00_raw_data/ipums/dhs/2015/geo_shp/IAGE71FL.shp") %>% filter(LATNUM != 0)%>%

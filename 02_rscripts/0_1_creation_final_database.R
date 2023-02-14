@@ -22,8 +22,8 @@ data_indiv <- read_ipums_micro(ddi_indiv, verbose = F) %>% filter(YEAR == 2015) 
 df_indiv_hh <- right_join(data_indiv, data, by = c("IDHSHID","AGE" = "HHAGE", "HHLINENO"))%>% #on merge data indiv et HH pour avoir tous les membres du foyer
   filter(IDHSHID %in% c(unique(data_indiv$IDHSHID))) 
 
-
 geo_cov <- read.csv("00_raw_data/ipums/dhs/2015/geo_cov/IAGC72FL.csv")
+
 #1. CODE MATRI VARIABLES
 
 #1.1. RESIDENCE 
@@ -58,8 +58,33 @@ stat_resid_property <- df_resid %>% filter(!OWNHOUSEWHO %in% c(8,9)) %>%group_by
 
 write.csv(stat_resid_property, "04_stat_desc/stat_resid_house.csv")
 
+
+#1.2. AUTRE CODE RESIDENCE: NOMBRE D ANNEES PASSEES DANS LE FOYER DE RESIDENCE 
+
+df_resid_alt <- df_indiv_hh %>%
+  filter(SEX == 2, GEO_IA2015 == 22, !RESIDEINTYR %in% c(97, 98)) %>%
+  select(HHRELATE, HHEADSEXHH, IDHSHID, SEX,  URBANHH, HHLINENO, 
+         HHMEMBERS,  GEOALT_IA2015, MARSTAT, AGLANDWHO, OWNHOUSEWHO, AGE, 
+         HWFANEMIALVL, IDHSPID, PERWEIGHT, HWFBMI, CHEB, HWFWEIGHT, HWFHEIGHT, HHWEIGHT, 
+         HWFHEMOLEVELALT, HHMEMBERS, contains("BIRTHWT"), RESIDEINTYR, PREGNANT, EDYRTOTAL:HUSFERTPREF, 
+         contains("IRON"), CLUSTERNO, DHSID, GEO_IA2015, EDUCLVL, WEALTHQ)%>%
+  mutate(resid_year = case_when(RESIDEINTYR == 95 ~ "Always", 
+                                T ~ "Visitor"))
+  
+
+# 
+# View(df_resid %>% select(IDHSHID, SEX, MARSTAT, residence_indiv_level, resid, HHRELATE, RESIDEINTYR))
+# View(df_indiv_hh %>% select(IDHSHID, SEX, MARSTAT, HHRELATE, AGE))
+
+stat_resid_property <- df_resid %>% filter(!OWNHOUSEWHO %in% c(8,9)) %>%group_by(residence_indiv_level, OWNHOUSEWHO) %>% count() %>%
+  mutate(OWNHOUSEWHO = as_factor(OWNHOUSEWHO)) %>%
+  spread(residence_indiv_level, n) %>% adorn_totals(c("row", "col"))
+
+write.csv(stat_resid_property, "04_stat_desc/stat_resid_house.csv")
+
 #2. HEALTH VARIABLES 
 
+#2.1. CORESIDENCE WITH KIN
 df_health_matri_without_na_india <- df_resid %>%
   mutate(HWFBMI = HWFBMI/100, 
          HWFHEMOLEVELALT= HWFHEMOLEVELALT/10) %>%
@@ -87,6 +112,30 @@ saveRDS(object = df_health_matri_without_na_india, file = "01_tidy_data/resid_cl
 
 saveRDS(object = df_health_matri_without_na_megha, file = "01_tidy_data/resid_clean_megha.rds")
 
+#2.2. RESIDENCE IN NATAL HOUSE
+df_health_alt_matri_without_na <- df_resid_alt %>%
+  mutate(HWFBMI = HWFBMI/100, 
+         HWFHEMOLEVELALT= HWFHEMOLEVELALT/10) %>%
+  replace_with_na(replace = list(CHEB = c(99,98),
+                                 HWFWEIGHT = c(9994: 9999), 
+                                 HWFHEIGHT = c(9994: 9999), 
+                                 HWFHEMOLEVELALT = c(992:999), 
+                                 BIRTHWT_01 = c(9995:9999), 
+                                 BIRTHWT_02 = c(9995:9999), 
+                                 BIRTHWT_03 = c(9995:9999), 
+                                 BIRTHWT_04 = c(9995:9999), 
+                                 BIRTHWT_05 = c(9995:9999), 
+                                 BIRTHWT_06 = c(9995:9999), 
+                                 HUSFERTPREF = c(7, 8, 9), 
+                                 FPLCHDESIRE = c(7, 8, 9), 
+                                 OWNHOUSEWHO = c(8, 9), 
+                                 HWFBMI = c(9997:9999), 
+                                 AGE = c(95:98))) %>%
+  
+  filter(!is.na(OWNHOUSEWHO)) %>%
+  inner_join(geo_cov, by = c("CLUSTERNO" = "DHSCLUST")) #variables geographiques pour les contrôles
+
+saveRDS(object = df_health_alt_matri_without_na, file = "MatriHealthDHS/01_tidy_data/resid_philopatry_clean_megha.rds")
 
 #other way for residence #####
 

@@ -6,13 +6,13 @@ library(ipumsr)
 library(ggrepel)
 
 #0. LOADING DATA IPUMS 2015 HOUSEHOLD MEMBERS
-region_polygon <- st_read("00_raw_data/ipums/dhs_ipumsi_ia/dhs_ipumsi_ia.shp") 
+region_polygon <- st_read("00_raw_data/ipums/dhs_ipumsi_ia/dhs_ipumsi_ia.shp")
   filter(LATNUM != 0) 
   # select(ADM1DHS, ADM1NAME) %>% unique() %>%
   # mutate(ADM1NAME = str_replace(ADM1NAME, "NCT of ", ""), 
   #        ADM1NAME = str_replace(ADM1NAME, "&", "and"))
 
-df_final_withouth_NA <- readRDS("01_tidy_data/resid_clean_india.rds") %>%
+df_final_withouth_NA <- readRDS("MatriHealthDHS/01_tidy_data/resid_clean_india.rds") %>%
   select(IDHSHID, OWNHOUSEWHO, GEO_IA2015) %>% 
   filter(OWNHOUSEWHO %in% c(1, 2, 3)) %>%
   mutate(GEO_IA2015 = as_factor(GEO_IA2015), 
