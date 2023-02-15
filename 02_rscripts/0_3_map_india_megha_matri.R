@@ -12,6 +12,7 @@ region_polygon <- st_read("00_raw_data/ipums/dhs_ipumsi_ia/dhs_ipumsi_ia.shp")
   # mutate(ADM1NAME = str_replace(ADM1NAME, "NCT of ", ""), 
   #        ADM1NAME = str_replace(ADM1NAME, "&", "and"))
 
+#MAP INDIA MATRILINY
 df_final_withouth_NA <- readRDS("MatriHealthDHS/01_tidy_data/resid_clean_india.rds") %>%
   select(IDHSHID, OWNHOUSEWHO, GEO_IA2015) %>% 
   filter(OWNHOUSEWHO %in% c(1, 2, 3)) %>%
@@ -45,6 +46,34 @@ df_final_withouth_NA %>%
                    stat = "sf_coordinates",
         min.segment.length = 0)+ 
   labs(fill = "Percentage of households \nwith female ownership")
+ggsave("MatriHealthDHS/03_plots/map_india_ownership.png")
+#MAP MEGHA MATRILINY
+c<- st_read("00_raw_data/shrug/geometries_shrug-v1.5.samosa-open-polygons-shp/district.shp") %>% filter(pc11_s_id == "17")
+point <- st_read("00_raw_data/ipums/dhs/2015/geo_shp/IAGE71FL.shp")
+
+df_megha <- readRDS("MatriHealthDHS/01_tidy_data/resid_philopatry_clean_megha_2.rds") %>% mutate(d_name = as_factor(GEOALT_IA2015)) %>% 
+  group_by(d_name)%>%
+  mutate(count = n_distinct(IDHSHID), 
+         OWNHOUSEWHO = as_factor(OWNHOUSEWHO), 
+         DHSID= DHSID.x) %>% 
+  group_by(d_name, OWNHOUSEWHO) %>%
+  summarise(n = n_distinct(IDHSHID), count = count) %>% ungroup() %>% unique() %>%
+  mutate(percent = 100*n/ count) %>%
+  inner_join(c) %>%
+  st_as_sf()
+
+df_megha %>% 
+  filter(OWNHOUSEWHO== "Female member") %>% 
+  ggplot() +  
+  geom_sf(aes(fill = percent)) + 
+  theme_void() +  
+  theme(legend.position = "bottom") + 
+  geom_label_repel(aes(label = d_name, geometry = geometry), 
+                   xlim = c(1, NA),
+                   stat = "sf_coordinates",
+                   min.segment.length = 0)+ 
+  labs(fill = "Percentage of households \nwith female ownership")
+ggsave("MatriHealthDHS/03_plots/map_megha_ownership.png")
 
 #1. 
 

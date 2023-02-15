@@ -7,8 +7,16 @@ library(gtsummary)
 
 df_final <- readRDS("MatriHealthDHS/01_tidy_data/resid_philopatry_clean_megha.rds") %>%
   select(URBANHH, MARSTAT, OWNHOUSEWHO, AGE, HWFHEMOLEVELALT, HWFBMI, CHEB, resid_year, HHWEIGHT, PREGNANT, 
-         PERWEIGHT, EDUCLVL, WEALTHQ, PERWEIGHT, IDHSPID, IDHSHID, contains("BIRTH"), contains("2015"), CLUSTERNO ) %>%
-  mutate(across(-c(resid_year, PERWEIGHT, HHWEIGHT, HWFBMI, HWFHEMOLEVELALT, contains("BIRTH"), contains("2015"), CLUSTERNO), ~as_factor(.x))) %>%
+         PERWEIGHT, EDUCLVL, WEALTHQ, PERWEIGHT, IDHSPID, IDHSHID, contains("BIRTH"), contains("2015"), CLUSTERNO, 
+         Nightlights_Composite,
+         DECBIGHH,
+         DECFAMVISIT,
+         DECFEMEARN, 
+         DECFEMHCARE, 
+         DECHLCENTERGO, 
+         KIDDOBCMC_01) %>%
+  mutate(across(-c(resid_year, PERWEIGHT, HHWEIGHT, HWFBMI, HWFHEMOLEVELALT, contains("BIRTH"), contains("2015"), CLUSTERNO, 
+                   Nightlights_Composite), ~as_factor(.x))) %>%
   mutate(across(c(AGE:CHEB), ~as.numeric(.x))) %>%
   mutate(ANAEMIC = case_when(HWFHEMOLEVELALT < 12 ~ "Not anaemic", 
                              T ~ "Anaemic")) 
@@ -22,40 +30,40 @@ df_final_every_variables <- bind_cols(df_birth, df_final) %>% rename(birthweight
 write_rds(df_final_every_variables, "MatriHealthDHS/01_tidy_data/resid_philopatry_clean_megha_2.rds")
 
 df_final <- bind_cols(df_birth, df_final) %>% rename(birthweight = ".") %>%
-  mutate(birthweight = birthweight/1000) %>%select(-contains("2015"), -CLUSTERNO)
-
-
-gg_miss_var(df_final) #presque pas de variable manquante mashallah
+  mutate(birthweight = birthweight/1000) %>%select(-contains("2015"), -CLUSTERNO, -contains("BIRTHWT"))
 
 #getvarname#####
-
-ddi <- read_ipums_ddi("00_raw_data/ipums/idhs_00008.xml")
-data <- read_ipums_micro(ddi, verbose = F) %>% filter(YEAR == 2015)
-
-ddi_indiv <- read_ipums_ddi("00_raw_data/ipums/idhs_00010.xml")
-data_indiv <- read_ipums_micro(ddi_indiv, verbose = F) %>% filter(YEAR == 2015) %>%
-  select(- c(SAMPLE, SAMPLESTR, COUNTRY, YEAR, DHSID, IDHSPSU, IDHSSTRATA, HHID,
-             POPWT, GEO_IA1992_2015, GEO_IA2015,
-             GEOALT_IA2015)) %>% mutate(HHLINENO = as.integer(paste0("0", LINENO)))
-
-df_indiv_hh <- right_join(data_indiv, data, by = c("IDHSHID","AGE" = "HHAGE", "HHLINENO"))%>% #on merge data indiv et HH pour avoir tous les membres du foyer
-  filter(IDHSHID %in% c(unique(data_indiv$IDHSHID))) 
-varname <- ipums_var_info(df_indiv_hh, vars = everything()) %>% select(var_name, var_label)
-c <- data.frame(var_name = colnames(df_final)) %>% left_join(varname) %>%
-  mutate(var_label = case_when(var_name == "resid_year" ~ "Years lived in place of residence", 
-                                T ~ var_label))
-
-setnames(df_final, old = c$var_name, 
-         new = c$var_label)
+# 
+# ddi <- read_ipums_ddi("00_raw_data/ipums/idhs_00008.xml")
+# data <- read_ipums_micro(ddi, verbose = F) %>% filter(YEAR == 2015)
+# 
+# ddi_indiv <- read_ipums_ddi("00_raw_data/ipums/idhs_00010.xml")
+# data_indiv <- read_ipums_micro(ddi_indiv, verbose = F) %>% filter(YEAR == 2015) %>%
+#   select(- c(SAMPLE, SAMPLESTR, COUNTRY, YEAR, DHSID, IDHSPSU, IDHSSTRATA, HHID,
+#              POPWT, GEO_IA1992_2015, GEO_IA2015,
+#              GEOALT_IA2015)) %>% mutate(HHLINENO = as.integer(paste0("0", LINENO)))
+# 
+# df_indiv_hh <- right_join(data_indiv, data, by = c("IDHSHID","AGE" = "HHAGE", "HHLINENO"))%>% #on merge data indiv et HH pour avoir tous les membres du foyer
+#   filter(IDHSHID %in% c(unique(data_indiv$IDHSHID))) 
+# varname <- ipums_var_info(df_indiv_hh, vars = everything()) %>% select(var_name, var_label)
+# c <- data.frame(var_name = colnames(df_final)) %>% left_join(varname) %>%
+#   mutate(var_label = case_when(var_name == "resid_year" ~ "Years lived in place of residence", 
+#                                 T ~ var_label))
+# 
+# setnames(df_final, old = c$var_name, 
+#          new = c$var_label)
 
 #df_final : final database with right varnames
-
 
 #1. STAT DESC#####
 
 #transforme df en survey design pour les stats desc avec poids
 df_final_indiv <- df_final %>% select(-c(URBANHH, OWNHOUSEWHO, WEALTHQ, HHWEIGHT, IDHSHID))
 df_final_hh <- df_final %>% select(URBANHH, OWNHOUSEWHO, WEALTHQ, HHWEIGHT, IDHSHID) %>% unique()
+
+#missing values
+gg_miss_var(df_final_indiv) #presque pas de variable manquante mashallah
+gg_miss_var(df_final_hh)
 
 df_survey_indiv <- svydesign(weights=~PERWEIGHT, nest=F, data=df_final_indiv, id = ~IDHSPID)
 stat_desc_indiv <- df_survey_indiv %>% 
@@ -68,8 +76,10 @@ stat_desc_indiv <- df_survey_indiv %>%
              HWFBMI ~ "BMI", 
              ANAEMIC ~ "Anaemic",
              birthweight ~ "Mean birthweight", 
-             PREGNANT ~ "Currently pregnant"), 
-    include = c(birthweight:PREGNANT, EDUCLVL, ANAEMIC),
+             PREGNANT ~ "Currently pregnant", 
+             DECFEMHCARE ~ "Final say on woman's health care", 
+             DECHLCENTERGO ~ "Can visit health center/hospital alone"), 
+    include = c(birthweight:PREGNANT, EDUCLVL, ANAEMIC,DECBIGHH: DECHLCENTERGO),
     statistic = list(all_continuous()  ~ "{mean} ({sd})",
                      all_categorical() ~ "{n}    ({p}%)"),
     digits = list(all_continuous()  ~ c(1, 1),
