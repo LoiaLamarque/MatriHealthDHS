@@ -1,13 +1,13 @@
-library(tidyr)
-library(psych)
+library(tidyverse)
 library(survey)
 library(gtsummary)
+library(ipumsr)
 
 #on regarde les NA
 
 df_final <- readRDS("MatriHealthDHS/01_tidy_data/resid_philopatry_clean_megha.rds") %>%
   select(URBANHH, MARSTAT, OWNHOUSEWHO, AGE, HWFHEMOLEVELALT, HWFBMI, CHEB, resid_year, HHWEIGHT, PREGNANT, 
-         PERWEIGHT, EDUCLVL, WEALTHQ, PERWEIGHT, IDHSPID, IDHSHID, contains("BIRTH"), contains("2015"), CLUSTERNO, 
+         PERWEIGHT, EDUCLVL, WEALTHQ, PERWEIGHT, IDHSPID, IDHSHID, contains("BIRTH"), contains("2015"), CLUSTERNO, PSU, STRATA, 
          Nightlights_Composite,
          DECBIGHH,
          DECFAMVISIT,
@@ -58,27 +58,53 @@ df_final <- bind_cols(df_birth, df_final) %>% rename(birthweight = ".") %>%
 #1. STAT DESC#####
 
 #transforme df en survey design pour les stats desc avec poids
-df_final_indiv <- df_final %>% select(-c(URBANHH, OWNHOUSEWHO, WEALTHQ, HHWEIGHT, IDHSHID))
-df_final_hh <- df_final %>% select(URBANHH, OWNHOUSEWHO, WEALTHQ, HHWEIGHT, IDHSHID) %>% unique()
+# df_svey <- svydesign(ids = ~PSU, strata =~STRATA, weights =~PERWEIGHT+ HHWEIGHT, data = df_final) %>%
+#   tbl_svysummary(by = resid_year, 
+#                  # Use include to select variables
+#                  label = list(resid_year~"Number of years spent in the house", 
+#                               CHEB ~ "Number of children", 
+#                               AGE ~ "Age", 
+#                               HWFHEMOLEVELALT ~ "Hemoglobin level", 
+#                               HWFBMI ~ "BMI", 
+#                               ANAEMIC ~ "Anaemic",
+#                               birthweight ~ "Mean birthweight", 
+#                               PREGNANT ~ "Currently pregnant", 
+#                               DECFEMHCARE ~ "Final say on woman's health care", 
+#                               DECHLCENTERGO ~ "Can visit health center/hospital alone"), 
+#                  include = -c(IDHSPID:STRATA,HHWEIGHT, PERWEIGHT, KIDDOBCMC_01),
+#                  statistic = list(all_continuous()  ~ "{mean} ({sd})",
+#                                   all_categorical() ~ "{n}    ({p}%)"),
+#                  digits = list(all_continuous()  ~ c(1, 1),
+#                                all_categorical() ~ c(0, 1))
+#   ) %>%
+#   # modify_header(label = "**Variable**") %>%
+#   # modify_caption("Weighted descriptive statistics for individual variables") %>%
+#   bold_labels() %>% 
+#   modify_spanning_header(labl = "Variable", c("stat_1", "stat_2") ~ "**Number of years spent \nin the area**")%>%
+#   as_flex_table()
 
-#missing values
+
+df_final_indiv <- df_final %>% select(-c(URBANHH, OWNHOUSEWHO, WEALTHQ, HHWEIGHT, IDHSHID))
+df_final_hh <- df_final %>% select(URBANHH, OWNHOUSEWHO, WEALTHQ, HHWEIGHT, IDHSHID, PSU, STRATA, Nightlights_Composite) %>% unique()
+
+# missing values
 gg_miss_var(df_final_indiv) #presque pas de variable manquante mashallah
 gg_miss_var(df_final_hh)
 
-df_survey_indiv <- svydesign(weights=~PERWEIGHT, nest=F, data=df_final_indiv, id = ~IDHSPID)
-stat_desc_indiv <- df_survey_indiv %>% 
-  tbl_svysummary(by = resid_year, 
+df_survey_indiv <- svydesign(weights=~PERWEIGHT, ids = ~PSU, data=df_final_indiv, strata = ~STRATA)
+stat_desc_indiv <- df_survey_indiv %>%
+  tbl_svysummary(by = resid_year,
     # Use include to select variables
-    label = list(resid_year~"Number of years spent in the house", 
-             CHEB ~ "Number of children", 
-             AGE ~ "Age", 
-             HWFHEMOLEVELALT ~ "Hemoglobin level", 
-             HWFBMI ~ "BMI", 
+    label = list(resid_year~"Number of years spent in the house",
+             CHEB ~ "Number of children",
+             AGE ~ "Age",
+             HWFHEMOLEVELALT ~ "Hemoglobin level",
+             HWFBMI ~ "BMI",
              ANAEMIC ~ "Anaemic",
-             birthweight ~ "Mean birthweight", 
-             PREGNANT ~ "Currently pregnant", 
-             DECFEMHCARE ~ "Final say on woman's health care", 
-             DECHLCENTERGO ~ "Can visit health center/hospital alone"), 
+             birthweight ~ "Mean birthweight",
+             PREGNANT ~ "Currently pregnant",
+             DECFEMHCARE ~ "Final say on woman's health care",
+             DECHLCENTERGO ~ "Can visit health center/hospital alone"),
     include = c(birthweight:PREGNANT, EDUCLVL, ANAEMIC,DECBIGHH: DECHLCENTERGO),
     statistic = list(all_continuous()  ~ "{mean} ({sd})",
                      all_categorical() ~ "{n}    ({p}%)"),
@@ -87,18 +113,18 @@ stat_desc_indiv <- df_survey_indiv %>%
   ) %>%
   # modify_header(label = "**Variable**") %>%
   # modify_caption("Weighted descriptive statistics for individual variables") %>%
-  bold_labels() %>% 
+  bold_labels() %>%
   modify_spanning_header(labl = "Variable", c("stat_1", "stat_2") ~ "**Number of years spent \nin the area**")%>%
   as_flex_table()
 
 flextable::save_as_docx(stat_desc_indiv, path = "MatriHealthDHS/04_stat_desc/stat_desc_indiv_weighted.docx")
 
 ###survey household level
-df_survey_hh <- svydesign(weights=~HHWEIGHT, nest=F, data=df_final_hh, id = ~IDHSHID)
+df_survey_hh <- svydesign(weights=~HHWEIGHT, data=df_final_hh, id = ~PSU, strata = ~STRATA)
 stat_desc_hh <- df_survey_hh %>% 
   tbl_svysummary(by = OWNHOUSEWHO, 
     # Use include to select variables
-    include = c(URBANHH:WEALTHQ),
+    include = c(URBANHH:WEALTHQ, Nightlights_Composite),
     statistic = list(all_categorical() ~ "{n}    ({p}%)"),
     digits = list(all_categorical() ~ c(0, 1))
   ) %>%
@@ -111,14 +137,14 @@ stat_desc_hh <- df_survey_hh %>%
 flextable::save_as_docx(stat_desc_hh, path = "MatriHealthDHS/04_stat_desc/stat_desc_hh_weighted.docx")
 
 #other way (weigh more complicated)
-
-stat_desc_cat <- ExpCustomStat(df_final,Cvar=c("Gender of HH member who owns house","Urban-rural status","Years lived in place of residence",
-                              "Highest educational level"),gpby=FALSE)
-  
-writexl::write_xlsx(stat_desc_cat, "MatriHealthDHS/04_stat_desc/counting_cat_variables.xlsx")
-
-stat_desc_num <- df_final %>% select_if(~is.numeric(.))%>%
-  describe()
+# 
+# stat_desc_cat <- ExpCustomStat(df_final,Cvar=c("Gender of HH member who owns house","Urban-rural status","Years lived in place of residence",
+#                               "Highest educational level"),gpby=FALSE)
+#   
+# writexl::write_xlsx(stat_desc_cat, "MatriHealthDHS/04_stat_desc/counting_cat_variables.xlsx")
+# 
+# stat_desc_num <- df_final %>% select_if(~is.numeric(.))%>%
+#   describe()
 
 #2. COUNTING MISSING VALUE FOR THE EPIDEMIOLOGICAL FLOWCHART 
 # 

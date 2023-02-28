@@ -74,10 +74,13 @@ df_final <- readRDS("MatriHealthDHS/01_tidy_data/resid_philopatry_clean_megha_2.
 
 #2. DAG: la relation entre matrilinéarité et santé des femmes est-elle médiée par des variables? 
 
-matri_health_dag <- dagify(Anaemia ~ Matri_property,
-                           Anaemia ~ Matri_locality, 
-                           EducLevel ~ Eco_dev, 
+matri_health_dag <- dagify(EducLevel ~~ Eco_dev, 
                            Anaemia ~ EducLevel + Matri_locality + Matri_property + Eco_dev, 
+                           Matri_property ~ Matri_property, 
+                           FemaleAutonomy ~ Matri_property, 
+                           Anaemia ~ FemaleAutonomy, 
+                           ParentalInvest ~ Matri_locality, 
+                           Anaemia ~ ParentalInvest, 
                            Matri_property ~ EducLevel, 
                            Matri_locality ~ EducLevel, 
                            labels = c("Anaemia" = "Anaemia", 
@@ -86,7 +89,7 @@ matri_health_dag <- dagify(Anaemia ~ Matri_property,
                                      "Matri_property" = "Matri_property", 
                                      "Eco_dev" = "Eco_dev"), 
                            outcome = "Anaemia", 
-                           exposure = 'Matri_property')
+                           exposure = c('Matri_property', 'Matri_locality'))
 
 ggdag(matri_health_dag, text = T, text_col = "black") 
 ggdag_adjustment_set(matri_health_dag, text = T, shadow = T, text_col = "black")

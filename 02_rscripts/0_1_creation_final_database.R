@@ -31,7 +31,7 @@ df_resid <- df_indiv_hh %>%
          HHMEMBERS,  GEOALT_IA2015, MARSTAT, AGLANDWHO, OWNHOUSEWHO, AGE, 
          HWFANEMIALVL, IDHSPID, PERWEIGHT, HWFBMI, CHEB, HWFWEIGHT, HWFHEIGHT, HHWEIGHT, 
          HWFHEMOLEVELALT, HHMEMBERS, contains("BIRTHWT"), RESIDEINTYR, PREGNANT, EDYRTOTAL:HUSFERTPREF, 
-         contains("IRON"), CLUSTERNO, DHSID, GEO_IA2015, contains("KIDDO"), contains("DEC"))%>%
+         contains("IRON"), CLUSTERNO, DHSID, GEO_IA2015, contains("KIDDO"), contains("DEC"), PSU, STRATA)%>%
   group_by(IDHSHID) %>%
   mutate(relate = max(HHRELATE), 
          resid = case_when((relate <= 3 & 2 %in% HHRELATE) ~ "neolocal",
